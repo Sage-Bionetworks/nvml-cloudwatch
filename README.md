@@ -9,5 +9,6 @@ nvidia-docker run -d \
 --cpuset-cpus "0" \
 --memory 512m \
 --memory-swap 0m \
+-h $(docker-machine active) \
 --name nvml-cloudwatch docker.synapse.org/syn5644795/nvml-cloudwatch 
 

@@ -4,11 +4,8 @@ from pynvml import *
 import time
 import os
 import boto3
+import signal
 
-if __name__ == "__main__":
-    sys.exit(main())
-    
-    
 def signal_handler(signal, frame):
     print('Shutting down.')
     sys.exit(1)
@@ -16,32 +13,31 @@ def signal_handler(signal, frame):
 def main(argv=None):
     nvmlInit()
     #c = statsd.StatsClient(os.environ['statsd_host'], 8125)
-    cwc = boto3.client('cloudwatch')
+    cwc = boto3.client('cloudwatch', region_name='us-east-1')
 
     
     print "Driver Version:", nvmlSystemGetDriverVersion()
     deviceCount = nvmlDeviceGetCount()
+    host=os.getenv("host")
 
     while (True):
         for i in range(deviceCount):
             handle = nvmlDeviceGetHandleByIndex(i)
             info = nvmlDeviceGetMemoryInfo(handle)
-            cwc.put_metric_data(namespace="nnvida",name="gpu.memory.total-"+str(i),unit='Bytes',info.total)
-            cwc.put_metric_data(namespace="nnvida",name="gpu.memory.free-"+str(i),unit='Bytes',info.free)
-            cwc.put_metric_data(namespace="nnvida",name="gpu.memory.used-"+str(i),unit='Bytes',info.used)
-            # performance state is an enum. See https://docs.nvidia.com/deploy/pdf/NVML_API_Reference_Guide.pdf
-            cwc.put_metric_data(namespace="nnvida",name="gpu.power.state-"+str(i),unit='None',nvmlDeviceGetPerformanceState(handle))
-            # power usage is in milliwatts.  See https://docs.nvidia.com/deploy/pdf/NVML_API_Reference_Guide.pdf
-            cwc.put_metric_data(namespace="nnvida",name="gpu.power.usage-"+str(i),unit='None',nvmlDeviceGetPowerUsage(handle))
-            cwc.put_metric_data(namespace="nnvida",name="gpu.temperature-"+str(i),unit='None',nvmlDeviceGetTemperature(handle, NVML_TEMPERATURE_GPU))
-            # clock info is an enum.   See https://docs.nvidia.com/deploy/pdf/NVML_API_Reference_Guide.pdf
-            cwc.put_metric_data(namespace="nnvida",name="gpu.clock.graphics-"+str(i),unit='None',nvmlDeviceGetClockInfo(handle, NVML_CLOCK_GRAPHICS))
-            # clock sm is actually MHz.  See https://docs.nvidia.com/deploy/pdf/NVML_API_Reference_Guide.pdf
-            cwc.put_metric_data(namespace="nnvida",name="gpu.clock.sm-"+str(i),unit='None',nvmlDeviceGetClockInfo(handle, NVML_CLOCK_SM))
-            cwc.put_metric_data(namespace="nnvida",name="gpu.clock.mem-"+str(i),unit='Bytes',nvmlDeviceGetClockInfo(handle, NVML_CLOCK_MEM))
-            info = nvmlDeviceGetUtilizationRates(handle)
-            cwc.put_metric_data(namespace="nnvida",name="gpu.utilization.gpu-"+str(i),unit='Bytes',info.gpu)
-            cwc.put_metric_data(namespace="nnvida",name="gpu.utilization.memory-"+str(i),unit='Bytes',info.memory)
+            utilizationInfo = nvmlDeviceGetUtilizationRates(handle)
+            cwc.put_metric_data(Namespace=host,MetricData=[
+                {'MetricName':'gpu.memory.total-'+str(i),'Dimensions':[{"host":host}],'Value':info.total,'Unit':'Bytes'},
+                {'MetricName':"gpu.memory.free-"+str(i), 'Dimensions':[{"host":host}],'Value':info.free, 'Unit':'Bytes'},
+                {'MetricName':"gpu.memory.used-"+str(i),'Dimensions':[{"host":host}],'Value':info.used,'Unit':'Bytes'},
+                {'MetricName':"gpu.power.state-"+str(i),'Dimensions':[{"host":host}],'Value':nvmlDeviceGetPerformanceState(handle)},
+                {'MetricName':"gpu.power.usage-"+str(i),'Dimensions':[{"host":host}],'Value':nvmlDeviceGetPowerUsage(handle)},
+                {'MetricName':"gpu.temperature-"+str(i),'Dimensions':[{"host":host}],'Value':nvmlDeviceGetTemperature(handle, NVML_TEMPERATURE_GPU)},
+                {'MetricName':"gpu.clock.graphics-"+str(i),'Dimensions':[{"host":host}],'Value':nvmlDeviceGetClockInfo(handle, NVML_CLOCK_GRAPHICS)},
+                {'MetricName':"gpu.clock.sm-"+str(i),'Dimensions':[{"host":host}],'Value':nvmlDeviceGetClockInfo(handle, NVML_CLOCK_SM)},
+                {'MetricName':'gpu.clock.mem-'+str(i),'Dimensions':[{"host":host}],'Value':nvmlDeviceGetClockInfo(handle, NVML_CLOCK_MEM),'Unit':'Bytes'},
+                {'MetricName':"gpu.utilization.gpu-"+str(i),'Dimensions':[{"host":host}],'Value':utilizationInfo.gpu,'Unit':'Bytes'},
+                {'MetricName':"gpu.utilization.memory-"+str(i),'Dimensions':[{"host":host}],'Value':utilizationInfo.memory,'Unit':'Bytes'}
+            ])
     
         print "NVML metrics pushed to CloudWatch"
         time.sleep(60)
