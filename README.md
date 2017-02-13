@@ -9,6 +9,10 @@ docker run -d \
 --device /dev/nvidia1:/dev/nvidia1 \
 --device /dev/nvidia2:/dev/nvidia2 \
 --device /dev/nvidia3:/dev/nvidia3 \
+--device /dev/nvidia4:/dev/nvidia4 \
+--device /dev/nvidia5:/dev/nvidia5 \
+--device /dev/nvidia6:/dev/nvidia6 \
+--device /dev/nvidia7:/dev/nvidia7 \
 --device /dev/nvidiactl:/dev/nvidiactl \
 --device /dev/nvidia-uvm:/dev/nvidia-uvm \
 -v /usr/lib64/nvidia/libnvidia-ml.so:/usr/lib64/libnvidia-ml.so:ro \
